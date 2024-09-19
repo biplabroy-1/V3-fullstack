@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import Modal from './Modal.jsx'; // Adjust the import path
 
 const ScheduleForm = () => {
     const [ID, setID] = useState("");
@@ -21,6 +22,7 @@ const ScheduleForm = () => {
         Sunday: [],
     });
     const [allIDs, setAllIDs] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // Fetch all IDs from the server
     useEffect(() => {
@@ -137,15 +139,22 @@ const ScheduleForm = () => {
         }
     };
 
-    const DeleteSchedules = async (e) => {
-        if (selectedID === "") {
-            e.preventDefault();
+    const DeleteSchedules = (e) => {
+        e.preventDefault(); // Prevent default behavior for button click
+        if (!selectedID) {
             toast.warn("Nothing is selected");
             return;
         }
+        setIsModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
         try {
             const response = await axios.delete(`http://localhost:5000/api/schedule/delete/${selectedID}`);
             toast.success(response.data.message);
+            setIsModalOpen(false);
+            setSelectedID(""); // Reset selected ID
+            // Optionally refresh the ID list or state here
         } catch (error) {
             console.error("There was an error deleting the schedule:", error);
             toast.error("There was an error deleting the schedule.");
@@ -154,7 +163,18 @@ const ScheduleForm = () => {
 
     return (
         <div className="bg-white shadow-lg rounded-lg p-8 mb-4 w-full max-w-full mx-auto">
-            <ToastContainer />
+            <ToastContainer stacked
+                position="bottom-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+                transition:Bounce />
             <div className="flex flex-col md:flex-row">
                 <div className="w-full md:w-1/3 mb-6 md:mr-4">
                     <h2 className="text-xl font-bold mb-4">Schedule ID</h2>
@@ -195,6 +215,11 @@ const ScheduleForm = () => {
                             Delete This
                         </button>
                     </div>
+                    <Modal
+                        isOpen={isModalOpen}
+                        onClose={() => setIsModalOpen(false)}
+                        onConfirm={handleConfirmDelete} // Update here
+                    />
 
                     <div className="mb-4">
                         <label className="block text-gray-700 font-bold mb-2" htmlFor="university">
