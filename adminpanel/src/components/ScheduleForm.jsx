@@ -13,7 +13,6 @@ const initialSchedule = {
     Thursday: [],
     Friday: [],
     Saturday: [],
-    Sunday: [],
 };
 
 const periodTimes = [
@@ -43,6 +42,7 @@ const ScheduleForm = () => {
     const [allIDs, setAllIDs] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [classToDelete, setClassToDelete] = useState(null);
+    const [currentDay, setCurrentDay] = useState("Monday");
 
     const fetchIDs = useCallback(async () => {
         try {
@@ -209,6 +209,18 @@ const ScheduleForm = () => {
                 return acc;
             }, {});
 
+            // Validate required fields for non-free classes
+            for (const day in filteredSchedule) {
+                for (const cls of filteredSchedule[day]) {
+                    if (cls.Class_type !== "Free") {
+                        if (!cls.Course_Name || !cls.Instructor || !cls.Room) {
+                            toast.error(`Course Name, Instructor, and Room are required for non-free classes.`);
+                            return;
+                        }
+                    }
+                }
+            }
+
             const dataToSend = {
                 ...formData,
                 schedule: filteredSchedule
@@ -244,7 +256,9 @@ const ScheduleForm = () => {
         }
     };
 
-    // ... (rest of the JSX remains largely the same, with updates to use formData)
+    const handleDayChange = (day) => {
+        setCurrentDay(day);
+    };
 
     return (
         <div className="bg-white shadow-lg rounded-lg p-8 mb-4 w-full max-w-full mx-auto">
@@ -371,231 +385,232 @@ const ScheduleForm = () => {
                             placeholder="Enter Section (e.g., A)"
                         />
                     </div>
-                </div>
-
-                <div className="w-full md:w-2/3">
-                    <h2 className="text-xl font-bold mb-4">Class Schedule</h2>
-                    {Object.keys(formData.schedule).map((day) => (
-                        <div key={day} className="mb-6">
-                            <h3 className="text-gray-700 font-bold mb-4">{day}</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {formData.schedule[day].map((cls, index) => (
-                                    <div key={index} className="bg-gray-100 p-6 rounded-lg">
-                                        <button
-                                            type="button"
-                                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mb-2 float-right"
-                                            onClick={() => handleRemoveClass(day, index)}
-                                        >
-                                            Remove
-                                        </button>
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-period-${index}`}
-                                            >
-                                                Period:
-                                            </label>
-                                            <select
-                                                id={`${day}-period-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Period}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Period", e.target.value)
-                                                }
-                                            >
-                                                {periodTimes.map((period) => (
-                                                    <option key={period.period} value={period.period}>
-                                                        {period.period}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-start-time-${index}`}
-                                            >
-                                                Start Time:
-                                            </label>
-                                            <select
-                                                id={`${day}-start-time-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Start_Time}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Start_Time", e.target.value)
-                                                }
-                                            >
-                                                {periodTimes.map((period) => (
-                                                    <option key={period.start} value={period.start}>
-                                                        {period.start}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-end-time-${index}`}
-                                            >
-                                                End Time:
-                                            </label>
-                                            <input
-                                                id={`${day}-end-time-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                type="time"
-                                                value={cls.End_Time}
-                                                readOnly
-                                            />
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-class-type-${index}`}
-                                            >
-                                                Class Type:
-                                            </label>
-                                            <select
-                                                id={`${day}-class-type-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Class_type}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Class_type", e.target.value)
-                                                }
-                                            >
-                                                <option value="Theory">Theory</option>
-                                                <option value="Lab">Lab</option>
-                                                <option value="Free">Free</option>
-                                            </select>
-                                        </div>
-
-                                        {cls.Class_type !== "Free" && (
-                                            <>
-                                                <div className="mb-4">
-                                                    <label
-                                                        className="block text-gray-700 font-bold mb-2"
-                                                        htmlFor={`${day}-course-name-${index}`}
-                                                    >
-                                                        Course Name:
-                                                    </label>
-                                                    <input
-                                                        id={`${day}-course-name-${index}`}
-                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                        type="text"
-                                                        value={cls.Course_Name}
-                                                        onChange={(e) =>
-                                                            handleClassChange(day, index, "Course_Name", e.target.value)
-                                                        }
-                                                    />
-                                                </div>
-
-                                                <div className="mb-4">
-                                                    <label
-                                                        className="block text-gray-700 font-bold mb-2"
-                                                        htmlFor={`${day}-instructor-${index}`}
-                                                    >
-                                                        Instructor:
-                                                    </label>
-                                                    <input
-                                                        id={`${day}-instructor-${index}`}
-                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                        type="text"
-                                                        value={cls.Instructor}
-                                                        onChange={(e) =>
-                                                            handleClassChange(day, index, "Instructor", e.target.value)
-                                                        }
-                                                    />
-                                                </div>
-
-                                                <div className="mb-4">
-                                                    <label
-                                                        className="block text-gray-700 font-bold mb-2"
-                                                        htmlFor={`${day}-room-${index}`}
-                                                    >
-                                                        Room:
-                                                    </label>
-                                                    <input
-                                                        id={`${day}-room-${index}`}
-                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                        type="text"
-                                                        value={cls.Room}
-                                                        onChange={(e) =>
-                                                            handleClassChange(day, index, "Room", e.target.value)
-                                                        }
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-group-${index}`}
-                                            >
-                                                Group:
-                                            </label>
-                                            <select
-                                                id={`${day}-group-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Group}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Group", e.target.value)
-                                                }
-                                            >
-                                                <option value="All">All</option>
-                                                <option value="Group 1">Group 1</option>
-                                                <option value="Group 2">Group 2</option>
-                                            </select>
-                                        </div>
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-class-duration-${index}`}
-                                            >
-                                                Class Duration:
-                                            </label>
-                                            <select
-                                                id={`${day}-class-duration-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Class_Duration}
-                                                onChange={(e) =>
-                                                    handleClassChange(
-                                                        day,
-                                                        index,
-                                                        "Class_Duration",
-                                                        parseInt(e.target.value)
-                                                    )
-                                                }
-                                            >
-                                                {[1, 2, 3, 4].map((duration) => (
-                                                    <option key={duration} value={duration}>
-                                                        {duration} hour{duration > 1 ? "s" : ""}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <button
-                                type="button"
-                                className="bg-blue-500 duration-300 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
-                                onClick={() => handleAddClass(day)}
-                            >
-                                Add Class {day}
-                            </button>
-                        </div>
-                    ))}
-
+                    
                     <button
                         onClick={handleSubmit}
                         className="bg-green-500 duration-300 hover:bg-green-700 text-white font-bold py-3 px-6 rounded focus:outline-none focus:shadow-outline mt-4"
                     >
                         Add/Update Schedule
                     </button>
+                </div>
+
+                <div className="w-full md:w-2/3">
+                    <h2 className="text-xl font-bold mb-4">Class Schedule</h2>
+                    <div className="flex mb-4 overflow-x-auto">
+                        {Object.keys(formData.schedule).map((day) => (
+                            <button
+                                key={day}
+                                className={`mr-2 px-4 py-2 rounded whitespace-nowrap ${
+                                    currentDay === day ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                                }`}
+                                onClick={() => handleDayChange(day)}
+                            >
+                                {day}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-gray-700 font-bold mb-4">{currentDay}</h3>
+                            <button
+                                type="button"
+                                className="bg-blue-500 duration-300 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
+                                onClick={() => handleAddClass(currentDay)}
+                            >
+                                Add Class
+                            </button>
+                        </div>
+                        
+                        <div className="flex overflow-x-auto pb-4">
+                            {formData.schedule[currentDay].map((cls, index) => (
+                                <div key={index} className="bg-gray-100 p-6 rounded-lg mr-4 min-w-[300px]">
+                                    <button
+                                        type="button"
+                                        className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded mb-2 float-right"
+                                        onClick={() => handleRemoveClass(currentDay, index)}
+                                    >
+                                        Remove
+                                    </button>
+                                    <div className="mb-4">
+                                        <label
+                                            className="block text-gray-700 font-bold mb-2"
+                                            htmlFor={`${currentDay}-period-${index}`}
+                                        >
+                                            Period:
+                                        </label>
+                                        <select
+                                            id={`${currentDay}-period-${index}`}
+                                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                            value={cls.Period}
+                                            onChange={(e) =>
+                                                handleClassChange(currentDay, index, "Period", e.target.value)
+                                            }
+                                        >
+                                            {periodTimes.map((period) => (
+                                                <option key={period.period} value={period.period}>
+                                                    {period.period}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label
+                                            className="block text-gray-700 font-bold mb-2"
+                                            htmlFor={`${currentDay}-start-time-${index}`}
+                                        >
+                                            Start Time:
+                                        </label>
+                                        <select
+                                            id={`${currentDay}-start-time-${index}`}
+                                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                            value={cls.Start_Time}
+                                            onChange={(e) =>
+                                                handleClassChange(currentDay, index, "Start_Time", e.target.value)
+                                            }
+                                        >
+                                            {periodTimes.map((period) => (
+                                                <option key={period.start} value={period.start}>
+                                                    {period.start}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label
+                                            className="block text-gray-700 font-bold mb-2"
+                                            htmlFor={`${currentDay}-class-duration-${index}`}
+                                        >
+                                            Class Duration:
+                                        </label>
+                                        <select
+                                            id={`${currentDay}-class-duration-${index}`}
+                                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                            value={cls.Class_Duration}
+                                            onChange={(e) =>
+                                                handleClassChange(
+                                                    currentDay,
+                                                    index,
+                                                    "Class_Duration",
+                                                    parseInt(e.target.value)
+                                                )
+                                            }
+                                        >
+                                            {[1, 2, 3, 4].map((duration) => (
+                                                <option key={duration} value={duration}>
+                                                    {duration} hour{duration > 1 ? "s" : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="mb-4">
+                                        <label
+                                            className="block text-gray-700 font-bold mb-2"
+                                            htmlFor={`${currentDay}-class-type-${index}`}
+                                        >
+                                            Class Type:
+                                        </label>
+                                        <select
+                                            id={`${currentDay}-class-type-${index}`}
+                                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                            value={cls.Class_type}
+                                            onChange={(e) =>
+                                                handleClassChange(currentDay, index, "Class_type", e.target.value)
+                                            }
+                                        >
+                                            <option value="Theory">Theory</option>
+                                            <option value="Lab">Lab</option>
+                                            <option value="Free">Free</option>
+                                        </select>
+                                    </div>
+
+                                    {cls.Class_type !== "Free" && (
+                                        <>
+                                            <div className="mb-4">
+                                                <label
+                                                    className="block text-gray-700 font-bold mb-2"
+                                                    htmlFor={`${currentDay}-course-name-${index}`}
+                                                >
+                                                    Course Name:
+                                                </label>
+                                                <input
+                                                    id={`${currentDay}-course-name-${index}`}
+                                                    className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                    type="text"
+                                                    value={cls.Course_Name}
+                                                    onChange={(e) =>
+                                                        handleClassChange(currentDay, index, "Course_Name", e.target.value)
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <label
+                                                    className="block text-gray-700 font-bold mb-2"
+                                                    htmlFor={`${currentDay}-instructor-${index}`}
+                                                >
+                                                    Instructor:
+                                                </label>
+                                                <input
+                                                    id={`${currentDay}-instructor-${index}`}
+                                                    className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                    type="text"
+                                                    value={cls.Instructor}
+                                                    onChange={(e) =>
+                                                        handleClassChange(currentDay, index, "Instructor", e.target.value)
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <label
+                                                    className="block text-gray-700 font-bold mb-2"
+                                                    htmlFor={`${currentDay}-room-${index}`}
+                                                >
+                                                    Room:
+                                                </label>
+                                                <input
+                                                    id={`${currentDay}-room-${index}`}
+                                                    className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                    type="text"
+                                                    value={cls.Room}
+                                                    onChange={(e) =>
+                                                        handleClassChange(currentDay, index, "Room", e.target.value)
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="mb-4">
+                                        <label
+                                            className="block text-gray-700 font-bold mb-2"
+                                            htmlFor={`${currentDay}-group-${index}`}
+                                        >
+                                            Group:
+                                        </label>
+                                        <select
+                                            id={`${currentDay}-group-${index}`}
+                                            className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                            value={cls.Group}
+                                            onChange={(e) =>
+                                                handleClassChange(currentDay, index, "Group", e.target.value)
+                                            }
+                                        >
+                                            <option value="All">All</option>
+                                            <option value="Group 1">Group 1</option>
+                                            <option value="Group 2">Group 2</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
