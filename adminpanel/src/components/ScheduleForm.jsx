@@ -1,84 +1,107 @@
-// src/components/ScheduleForm.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Modal from './Modal.jsx'; // Adjust the import path
+import Modal from './Modal';
+
+const API_BASE_URL = "http://localhost:5000/api/schedule";
+
+const initialSchedule = {
+    Monday: [],
+    Tuesday: [],
+    Wednesday: [],
+    Thursday: [],
+    Friday: [],
+    Saturday: [],
+    Sunday: [],
+};
+
+const periodTimes = [
+    { period: 1, start: "08:00", end: "09:00" },
+    { period: 2, start: "09:00", end: "10:00" },
+    { period: 3, start: "10:00", end: "11:00" },
+    { period: 4, start: "11:00", end: "12:00" },
+    { period: 5, start: "12:00", end: "13:00" },
+    { period: 6, start: "13:00", end: "14:00" },
+    { period: 7, start: "14:00", end: "15:00" },
+    { period: 8, start: "15:00", end: "16:00" },
+    { period: 9, start: "16:00", end: "17:00" },
+    { period: 10, start: "17:00", end: "18:00" },
+    { period: 11, start: "18:00", end: "19:00" },
+];
 
 const ScheduleForm = () => {
-    const [ID, setID] = useState("");
-    const [selectedID, setSelectedID] = useState("");
-    const [university, setUniversity] = useState("");
-    const [program, setProgram] = useState("");
-    const [section, setSection] = useState("");
-    const [semester, setSemester] = useState("");
-    const [schedule, setSchedule] = useState({
-        Monday: [],
-        Tuesday: [],
-        Wednesday: [],
-        Thursday: [],
-        Friday: [],
-        Saturday: [],
-        Sunday: [],
+    const [formData, setFormData] = useState({
+        ID: "",
+        selectedID: "",
+        university: "",
+        program: "",
+        section: "",
+        semester: "",
+        schedule: initialSchedule,
     });
     const [allIDs, setAllIDs] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [classToDelete, setClassToDelete] = useState(null);
 
-    // Fetch all IDs from the server
+    const fetchIDs = useCallback(async () => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/ids`);
+            setAllIDs(response.data.ids);
+        } catch (error) {
+            console.error("Error fetching IDs:", error);
+            toast.error("Error fetching IDs");
+        }
+    }, []);
+
     useEffect(() => {
-        const fetchIDs = async () => {
-            try {
-                const response = await axios.get("http://localhost:5000/api/schedule/ids");
-                setAllIDs(response.data.ids);
-            } catch (error) {
-                console.error("Error fetching IDs:", error);
-                toast.error("Error fetching IDs:", error);
-            }
-        };
-
         fetchIDs();
-    }, [program, section, semester, university]);
+    }, [fetchIDs]);
 
     useEffect(() => {
-        // Automatically update the ID based on the program, section, and semester
+        const { program, section, semester, university } = formData;
         if (program && section && semester && university) {
-            setID(`${university}-${program}-${semester}-${section}`);
+            setFormData(prev => ({ ...prev, ID: `${university}-${program}-${semester}-${section}` }));
         } else {
-            setID("");
+            setFormData(prev => ({ ...prev, ID: "" }));
         }
-    }, [program, section, semester, university]);
+    }, [formData.program, formData.section, formData.semester, formData.university]);
 
     useEffect(() => {
-        if (selectedID) {
-            const fetchScheduleByID = async () => {
-                try {
-                    const response = await axios.get(
-                        `http://localhost:5000/api/schedule/find/${selectedID}`
-                    );
-                    const { semester, program, section, university, schedule } =
-                        response.data;
-                    setSemester(semester);
-                    setProgram(program);
-                    setSection(section);
-                    setSchedule(schedule);
-                    setUniversity(university);
-                    setID(selectedID);
-                } catch (error) {
-                    console.error("Error fetching schedule:", error);
-                    toast.error("Error fetching schedule:", error);
-                }
-            };
-
-            fetchScheduleByID();
+        if (formData.selectedID) {
+            fetchScheduleByID(formData.selectedID);
         }
-    }, [selectedID]);
+    }, [formData.selectedID]);
+
+    const fetchScheduleByID = async (id) => {
+        try {
+            const response = await axios.get(`${API_BASE_URL}/find/${id}`);
+            const { semester, program, section, university, schedule } = response.data;
+            setFormData(prev => ({
+                ...prev,
+                semester,
+                program,
+                section,
+                university,
+                schedule,
+                ID: id,
+            }));
+        } catch (error) {
+            console.error("Error fetching schedule:", error);
+            toast.error("Error fetching schedule");
+        }
+    };
 
     const handleAddClass = (day) => {
-        const existingClasses = schedule[day];
-        const newPeriod = existingClasses.length > 0 ? existingClasses[existingClasses.length - 1].Period + 1 : 1;
+        const existingClasses = formData.schedule[day];
+        const lastClass = existingClasses[existingClasses.length - 1];
+        const startTime = lastClass ? lastClass.End_Time : "08:00";
+        const periodIndex = periodTimes.findIndex(period => period.start === startTime);
+        const newPeriod = periodIndex + 1;
         const newClass = {
             Period: newPeriod,
-            Start_Time: "",
+            Start_Time: startTime,
+            End_Time: periodTimes[periodIndex].end,
             Course_Name: "",
             Instructor: "",
             Room: "",
@@ -86,52 +109,112 @@ const ScheduleForm = () => {
             Class_Duration: 1,
             Class_type: "Theory",
         };
-        setSchedule((prevSchedule) => ({
-            ...prevSchedule,
-            [day]: [...prevSchedule[day], newClass],
+        setFormData(prev => ({
+            ...prev,
+            schedule: {
+                ...prev.schedule,
+                [day]: [...prev.schedule[day], newClass],
+            }
         }));
     };
 
     const handleRemoveClass = (day, index) => {
-        setSchedule((prevSchedule) => {
-            const updatedDay = prevSchedule[day].filter((_, idx) => idx !== index);
-            return { ...prevSchedule, [day]: updatedDay };
-        });
+        setClassToDelete({ day, index });
+        setIsModalOpen(true);
+    };
+
+    const confirmRemoveClass = () => {
+        if (classToDelete) {
+            const { day, index } = classToDelete;
+            setFormData(prev => ({
+                ...prev,
+                schedule: {
+                    ...prev.schedule,
+                    [day]: prev.schedule[day].filter((_, idx) => idx !== index),
+                }
+            }));
+            setIsModalOpen(false);
+            setClassToDelete(null);
+        }
     };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        const v = value.toUpperCase();
-        if (name === "program") setProgram(v);
-        if (name === "section") setSection(v);
-        if (name === "semester") setSemester(v);
-        if (name === "university") setUniversity(v);
+        setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+    };
+
+    const calculateEndTime = (startTime, duration) => {
+        const startIndex = periodTimes.findIndex(period => period.start === startTime);
+        const endIndex = Math.min(startIndex + duration - 1, periodTimes.length - 1);
+        return periodTimes[endIndex].end;
     };
 
     const handleClassChange = (day, index, field, value) => {
-        const updatedDaySchedule = schedule[day].map((cls, idx) => {
-            if (idx === index) {
-                return { ...cls, [field]: value };
+        setFormData(prev => ({
+            ...prev,
+            schedule: {
+                ...prev.schedule,
+                [day]: prev.schedule[day].map((cls, idx) => {
+                    if (idx === index) {
+                        let updatedClass = { ...cls, [field]: value };
+                        if (field === "Period") {
+                            const selectedPeriod = periodTimes.find(p => p.period === parseInt(value));
+                            updatedClass.Start_Time = selectedPeriod.start;
+                            updatedClass.End_Time = calculateEndTime(selectedPeriod.start, updatedClass.Class_Duration);
+                        } else if (field === "Start_Time") {
+                            updatedClass.Period = periodTimes.find(p => p.start === value).period;
+                            updatedClass.End_Time = calculateEndTime(value, updatedClass.Class_Duration);
+                        } else if (field === "Class_Duration") {
+                            updatedClass.End_Time = calculateEndTime(updatedClass.Start_Time, parseInt(value));
+                        }
+                        return updatedClass;
+                    }
+                    return cls;
+                }),
             }
-            return cls;
-        });
-        setSchedule((prevSchedule) => ({
-            ...prevSchedule,
-            [day]: updatedDaySchedule,
         }));
+
+        // Update subsequent classes' start times
+        if (field === "End_Time" || field === "Class_Duration") {
+            setFormData(prev => ({
+                ...prev,
+                schedule: {
+                    ...prev.schedule,
+                    [day]: prev.schedule[day].map((cls, idx) => {
+                        if (idx > index) {
+                            const prevClass = prev.schedule[day][idx - 1];
+                            const updatedClass = {
+                                ...cls,
+                                Start_Time: prevClass.End_Time,
+                                Period: periodTimes.find(p => p.start === prevClass.End_Time).period,
+                                End_Time: calculateEndTime(prevClass.End_Time, cls.Class_Duration)
+                            };
+                            return updatedClass;
+                        }
+                        return cls;
+                    }),
+                }
+            }));
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post("http://localhost:5000/api/schedule/add", {
-                ID,
-                semester,
-                program,
-                section,
-                university,
-                schedule,
-            });
+            // Filter out empty days from the schedule
+            const filteredSchedule = Object.entries(formData.schedule).reduce((acc, [day, classes]) => {
+                if (classes.length > 0) {
+                    acc[day] = classes;
+                }
+                return acc;
+            }, {});
+
+            const dataToSend = {
+                ...formData,
+                schedule: filteredSchedule
+            };
+
+            const response = await axios.post(`${API_BASE_URL}/add`, dataToSend);
             toast.success(response.data.message);
         } catch (error) {
             console.error("There was an error adding the schedule:", error);
@@ -139,9 +222,9 @@ const ScheduleForm = () => {
         }
     };
 
-    const DeleteSchedules = (e) => {
-        e.preventDefault(); // Prevent default behavior for button click
-        if (!selectedID) {
+    const handleDeleteSchedules = (e) => {
+        e.preventDefault();
+        if (!formData.selectedID) {
             toast.warn("Nothing is selected");
             return;
         }
@@ -150,16 +233,18 @@ const ScheduleForm = () => {
 
     const handleConfirmDelete = async () => {
         try {
-            const response = await axios.delete(`http://localhost:5000/api/schedule/delete/${selectedID}`);
+            const response = await axios.delete(`${API_BASE_URL}/delete/${formData.selectedID}`);
             toast.success(response.data.message);
             setIsModalOpen(false);
-            setSelectedID(""); // Reset selected ID
-            // Optionally refresh the ID list or state here
+            setFormData(prev => ({ ...prev, selectedID: "" }));
+            fetchIDs();
         } catch (error) {
             console.error("There was an error deleting the schedule:", error);
             toast.error("There was an error deleting the schedule.");
         }
     };
+
+    // ... (rest of the JSX remains largely the same, with updates to use formData)
 
     return (
         <div className="bg-white shadow-lg rounded-lg p-8 mb-4 w-full max-w-full mx-auto">
@@ -185,8 +270,8 @@ const ScheduleForm = () => {
                         <select
                             id="selectedID"
                             className="shadow cursor-pointer appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                            value={selectedID}
-                            onChange={(e) => setSelectedID(e.target.value)}
+                            value={formData.selectedID}
+                            onChange={(e) => setFormData(prev => ({ ...prev, selectedID: e.target.value }))}
                         >
                             <option className="hidden" value="">
                                 Select Existing ID
@@ -208,17 +293,18 @@ const ScheduleForm = () => {
                             className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             type="text"
                             name="ID"
-                            value={ID}
+                            value={formData.ID}
                             readOnly
                         />
-                        <button onClick={DeleteSchedules} className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                        <button onClick={handleDeleteSchedules} className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
                             Delete This
                         </button>
                     </div>
                     <Modal
                         isOpen={isModalOpen}
                         onClose={() => setIsModalOpen(false)}
-                        onConfirm={handleConfirmDelete} // Update here
+                        onConfirm={classToDelete ? confirmRemoveClass : handleConfirmDelete}
+                        message={classToDelete ? "Are you sure you want to delete this class?" : "Are you sure you want to delete this schedule?"}
                     />
 
                     <div className="mb-4">
@@ -230,7 +316,7 @@ const ScheduleForm = () => {
                             className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             type="text"
                             name="university"
-                            value={university}
+                            value={formData.university}
                             onChange={handleInputChange}
                             placeholder="Enter university (e.g., BWU)"
                         />
@@ -245,7 +331,7 @@ const ScheduleForm = () => {
                             className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             type="text"
                             name="program"
-                            value={program}
+                            value={formData.program}
                             onChange={handleInputChange}
                             placeholder="Enter Program (e.g., BCA)"
                         />
@@ -259,7 +345,7 @@ const ScheduleForm = () => {
                             id="semester"
                             className="shadow cursor-pointer appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             name="semester"
-                            value={semester}
+                            value={formData.semester}
                             onChange={handleInputChange}
                         >
                             <option className="hidden" value="">
@@ -280,7 +366,7 @@ const ScheduleForm = () => {
                             className="shadow uppercase appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             type="text"
                             name="section"
-                            value={section}
+                            value={formData.section}
                             onChange={handleInputChange}
                             placeholder="Enter Section (e.g., A)"
                         />
@@ -289,11 +375,11 @@ const ScheduleForm = () => {
 
                 <div className="w-full md:w-2/3">
                     <h2 className="text-xl font-bold mb-4">Class Schedule</h2>
-                    {Object.keys(schedule).map((day) => (
+                    {Object.keys(formData.schedule).map((day) => (
                         <div key={day} className="mb-6">
                             <h3 className="text-gray-700 font-bold mb-4">{day}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {schedule[day].map((cls, index) => (
+                                {formData.schedule[day].map((cls, index) => (
                                     <div key={index} className="bg-gray-100 p-6 rounded-lg">
                                         <button
                                             type="button"
@@ -317,9 +403,9 @@ const ScheduleForm = () => {
                                                     handleClassChange(day, index, "Period", e.target.value)
                                                 }
                                             >
-                                                {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
-                                                    <option key={num} value={num}>
-                                                        {num}
+                                                {periodTimes.map((period) => (
+                                                    <option key={period.period} value={period.period}>
+                                                        {period.period}
                                                     </option>
                                                 ))}
                                             </select>
@@ -332,69 +418,116 @@ const ScheduleForm = () => {
                                             >
                                                 Start Time:
                                             </label>
-                                            <input
+                                            <select
                                                 id={`${day}-start-time-${index}`}
                                                 className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                                 value={cls.Start_Time}
                                                 onChange={(e) =>
                                                     handleClassChange(day, index, "Start_Time", e.target.value)
                                                 }
+                                            >
+                                                {periodTimes.map((period) => (
+                                                    <option key={period.start} value={period.start}>
+                                                        {period.start}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="mb-4">
+                                            <label
+                                                className="block text-gray-700 font-bold mb-2"
+                                                htmlFor={`${day}-end-time-${index}`}
+                                            >
+                                                End Time:
+                                            </label>
+                                            <input
+                                                id={`${day}-end-time-${index}`}
+                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                type="time"
+                                                value={cls.End_Time}
+                                                readOnly
                                             />
                                         </div>
 
                                         <div className="mb-4">
                                             <label
                                                 className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-course-name-${index}`}
+                                                htmlFor={`${day}-class-type-${index}`}
                                             >
-                                                Course Name:
+                                                Class Type:
                                             </label>
-                                            <input
-                                                id={`${day}-course-name-${index}`}
+                                            <select
+                                                id={`${day}-class-type-${index}`}
                                                 className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                type="text"
-                                                value={cls.Course_Name}
+                                                value={cls.Class_type}
                                                 onChange={(e) =>
-                                                    handleClassChange(day, index, "Course_Name", e.target.value)
+                                                    handleClassChange(day, index, "Class_type", e.target.value)
                                                 }
-                                            />
+                                            >
+                                                <option value="Theory">Theory</option>
+                                                <option value="Lab">Lab</option>
+                                                <option value="Free">Free</option>
+                                            </select>
                                         </div>
 
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-instructor-${index}`}
-                                            >
-                                                Instructor:
-                                            </label>
-                                            <input
-                                                id={`${day}-instructor-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                type="text"
-                                                value={cls.Instructor}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Instructor", e.target.value)
-                                                }
-                                            />
-                                        </div>
+                                        {cls.Class_type !== "Free" && (
+                                            <>
+                                                <div className="mb-4">
+                                                    <label
+                                                        className="block text-gray-700 font-bold mb-2"
+                                                        htmlFor={`${day}-course-name-${index}`}
+                                                    >
+                                                        Course Name:
+                                                    </label>
+                                                    <input
+                                                        id={`${day}-course-name-${index}`}
+                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                        type="text"
+                                                        value={cls.Course_Name}
+                                                        onChange={(e) =>
+                                                            handleClassChange(day, index, "Course_Name", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
 
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-room-${index}`}
-                                            >
-                                                Room:
-                                            </label>
-                                            <input
-                                                id={`${day}-room-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                type="text"
-                                                value={cls.Room}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Room", e.target.value)
-                                                }
-                                            />
-                                        </div>
+                                                <div className="mb-4">
+                                                    <label
+                                                        className="block text-gray-700 font-bold mb-2"
+                                                        htmlFor={`${day}-instructor-${index}`}
+                                                    >
+                                                        Instructor:
+                                                    </label>
+                                                    <input
+                                                        id={`${day}-instructor-${index}`}
+                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                        type="text"
+                                                        value={cls.Instructor}
+                                                        onChange={(e) =>
+                                                            handleClassChange(day, index, "Instructor", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="mb-4">
+                                                    <label
+                                                        className="block text-gray-700 font-bold mb-2"
+                                                        htmlFor={`${day}-room-${index}`}
+                                                    >
+                                                        Room:
+                                                    </label>
+                                                    <input
+                                                        id={`${day}-room-${index}`}
+                                                        className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                                        type="text"
+                                                        value={cls.Room}
+                                                        onChange={(e) =>
+                                                            handleClassChange(day, index, "Room", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
 
                                         <div className="mb-4">
                                             <label
@@ -444,26 +577,6 @@ const ScheduleForm = () => {
                                                 ))}
                                             </select>
                                         </div>
-
-                                        <div className="mb-4">
-                                            <label
-                                                className="block text-gray-700 font-bold mb-2"
-                                                htmlFor={`${day}-class-type-${index}`}
-                                            >
-                                                Class Type:
-                                            </label>
-                                            <select
-                                                id={`${day}-class-type-${index}`}
-                                                className="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                                value={cls.Class_type}
-                                                onChange={(e) =>
-                                                    handleClassChange(day, index, "Class_type", e.target.value)
-                                                }
-                                            >
-                                                <option value="Theory">Theory</option>
-                                                <option value="Lab">Lab</option>
-                                            </select>
-                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -472,7 +585,7 @@ const ScheduleForm = () => {
                                 className="bg-blue-500 duration-300 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
                                 onClick={() => handleAddClass(day)}
                             >
-                                Add New Class to {day}
+                                Add Class {day}
                             </button>
                         </div>
                     ))}
