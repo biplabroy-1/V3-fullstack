@@ -2,14 +2,16 @@
 const mongoose = require('mongoose');
 
 const classSchema = new mongoose.Schema({
-    Period: String,
-    Time: String,
-    Course_Name: String,
-    Instructor: String,
-    Room: String,
-    Group: String,
-    Class_Duration: String,
-    Class_type: String,
+  Period: String,
+  Start_Time: String,
+  End_Time: String,
+  Course_Name: String,
+  Instructor: String,
+  Room: String,
+  Group: String,
+  Class_Duration: Number,
+  Class_Count: Number,
+  Class_type: String,
 });
 
 const scheduleSchema = new mongoose.Schema({
